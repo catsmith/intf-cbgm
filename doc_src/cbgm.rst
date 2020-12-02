@@ -28,30 +28,6 @@ All input data must be converted and imported into one Postgres database.
   previous editorial decisions regarding the priority of the readings.
   If this database is not supplied default priorities are used.
 
-.. pic:: uml
-   :caption: Database Preparation for CBGM
-
-   skinparam backgroundColor transparent
-
-   database  "ECM"        as dbsrc1
-   database  "Leitzeile"  as dbsrc2
-   database  "VarGen"     as dbsrc3
-   note left of dbsrc1: mysql
-
-   component "import.py"  as import
-   component "prepare.py" as prepare
-   database  "Acts"       as db1
-   database  "Acts"       as db2
-   note left of db1: Postgres
-   note right of import: copies mysql\nto Postgres
-   note right of prepare: normalizes and\nchecks data integrity
-
-   dbsrc1  --> import
-   dbsrc2  --> import
-   dbsrc3  --> import
-   import  --> db1
-   db1     --> prepare
-   prepare --> db2
 
 The `import.py` script copies the mysql databases into temporary tables of the
 postgres database without doing any integrity checking.
@@ -80,18 +56,6 @@ The `cbgm.py` script applies the CBGM method.
 The CBGM is applied at the start of every new project phase.
 It must also be applied immediately after the `prepare.py` script.
 
-.. pic:: uml
-   :caption: Applying the CBGM
-
-   skinparam backgroundColor transparent
-
-   database  "Acts"    as db1
-   component "cbgm.py" as cbgm
-   database  "Acts"    as db2
-   note right of cbgm: applies the\nCBGM method
-
-   db1  --> cbgm
-   cbgm --> db2
 
 
 .. _cbgm-new-project:

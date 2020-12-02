@@ -9,62 +9,6 @@ hosted.
 
 :code:`ntg.uni-muenster.de` is a Debian stable VM in the WWU OpenStack cloud.
 
-.. pic:: uml
-   :caption: Overview of VM
-   :html-classes: pic-w100
-
-   skinparam backgroundColor transparent
-
-   interface " "               as https
-   interface " "               as pubapi
-   component "Apache"          as apache
-   interface " "               as api
-   component "API server"      as app
-   component "Postgres"        as pg
-
-   database  "User"            as dba #yellow
-
-   database  "Acts\nPh 4"      as db1
-   database  "Acts\nPh 5"      as db2
-   database  "Mark\nPh 1.2"    as db3
-   database  "Mark\nPh 2"      as db4
-   database  "Mark\nPh 2.2"    as db5
-   database  "John\nPh 1"      as db6
-   database  "John Fam\nPh 1"  as db7
-   database  "2Sam\nPh 1"      as db8
-   database  "2Sam\nPh 2"      as db9
-   database  "CL\nPh 2"        as db10
-
-   database  "JS Client\nFiles"  as client
-   database  "Config\nFiles"     as config
-
-   note left  of https:   https://ntg.uni-muenster.de/
-   note right of pubapi:  https://ntg.uni-muenster.de/api/
-   note left  of client:  /var/www/ntg
-   note right of api:     http://localhost:5000/api/
-   note left  of config:  ~ntg/prj/ntg/ntg/instance/*.conf
-
-   https   --> apache
-   pubapi  --> apache
-   client  <-  apache
-   apache  --> api
-   api     --> app
-   config  <-  app
-   app     --> pg
-
-   pg      --> dba
-
-   pg      --> db1
-   pg      --> db2
-   pg      --> db3
-   pg      --> db4
-   pg      --> db5
-   pg      --> db6
-   pg      --> db7
-   pg      --> db8
-   pg      --> db9
-   pg      --> db10
-
 
 Apache
 ======

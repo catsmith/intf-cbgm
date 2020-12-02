@@ -26,28 +26,6 @@ The program suite consists of:
 #. an :mod:`API server <server>`, and
 #. a set of :mod:`scripts` to manipulate the CBGM database.
 
-.. pic:: uml
-   :caption: Overview of the program suite
-
-   skinparam backgroundColor transparent
-
-   component "Web Client" as client
-   note left of client: javascript
-
-   component "API Server" as api
-   note left of api: python
-
-   component "Scripts" as scripts
-   note right of scripts: python
-
-   database "Database" as db
-   note left of db: postgres
-
-   client --> api
-   api --> db
-   scripts --> db
-   api -[hidden]> scripts
-
 The web client runs in the browser.
 
 The API server can manage multiple databases.

@@ -24,10 +24,6 @@ Red: updated by the `scripts.cceh.cbgm` script.
 
 .. _db-overwiew:
 
-.. figure:: uml.*
-   :align: center
-
-   Overview of the CBGM database (some columns omitted)
 
 
 .. Palette https://github.com/d3/d3-scale-chromatic/blob/master/src/categorical/Paired.js
