@@ -58,7 +58,7 @@ def new_project(project_data):
     starts a new project
     """
     print('Starting a New Project.')
-    # TODO new project has no set_write_access() and no save_and_load_edits()
+    # TODO new project has no set_write_access() and no save_and_load_edits().
 
 
 def new_phase(project_data):
