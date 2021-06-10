@@ -44,6 +44,7 @@ BOOKS = [
 
     (27, "Ap",   "Revelation",     22),
 
+    (50, "Yasna", "Yasna",          6), # Zoroaster project
     (210, "2Sam", "2 Samuel",       2), # Hack for Septuaginta Test
 ]
 """ Titles of the NT books """
@@ -54,6 +55,7 @@ BYZ_HSNR = {
     "John"     : "(200070, 200280, 200450, 300180, 300350, 302260, 313200)",
     "Mark"     : "(300030, 300180, 300350, 301050, 302610, 303510, 326070)",
     "2 Samuel" : None,
+    "Yasna"    : None,
 }
 """Manuscripts attesting the Byzantine Text.
 
