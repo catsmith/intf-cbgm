@@ -1,5 +1,3 @@
-from tabnanny import format_witnesses
-
 import requests
 import xml.etree.ElementTree as ET
 import psycopg2
