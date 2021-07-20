@@ -134,11 +134,30 @@ for seg in segs:
         connection.rollback()
         pass
 
+clear_segment_locstem = "DELETE FROM locstem" \
+                        " WHERE pass_id=(select pass_id from passages where passage = %s)"
+clear_segment_cliques = "DELETE FROM cliques" \
+                        " WHERE pass_id=(select pass_id from passages where passage = %s)"
 reading_insert_query = "INSERT INTO readings (pass_id, labez, lesart)" \
                        " values ((select pass_id from passages where passage = %s), %s, %s)"
+clique_default_insert = "SET ntg.user_id = 0; INSERT INTO cliques(pass_id, labez)" \
+                         " values ((select pass_id from passages where passage = %s), %s)"
+locstem_default_insert = "SET ntg.user_id = 0; INSERT INTO locstem(pass_id, labez, source_labez)" \
+                               " values ((select pass_id from passages where passage = %s), %s, %s)"
 reading_update_query = "UPDATE readings set lesart=%s" \
                        " where pass_id=(select pass_id from passages where passage = %s) and labez=%s"
 for seg in segs:
+
+    # for now, clear out all the locstem and clique data if it exists when we import a segment
+    try:
+        cursor = connection.cursor()
+        data = (seg.get_address_range(),)
+        cursor.execute(clear_segment_locstem, data)
+        cursor.execute(clear_segment_cliques, data)
+        connection.commit()
+    except:
+        connection.rollback()
+        pass
     for reading_label in seg.readings.keys():
         reading = seg.readings[reading_label]
         data = (seg.get_address_range(), reading.label, reading.text)
@@ -157,6 +176,29 @@ for seg in segs:
             except psycopg2.errors.UniqueViolation:
                 connection.rollback()
                 pass
+
+# Add the default clique
+        try:
+            cursor = connection.cursor()
+            data = (seg.get_address_range(), reading.label)
+            print(clique_default_insert, data)
+            cursor.execute(clique_default_insert, data)
+            connection.commit()
+        except psycopg2.errors.UniqueViolation:
+            connection.rollback()
+
+# Add the default locstem
+        try:
+            cursor = connection.cursor()
+            if reading.label == 'a':
+                data = (seg.get_address_range(), reading.label, '*')
+            else:
+                data = (seg.get_address_range(), reading.label, '?')
+            print(locstem_default_insert, data)
+            cursor.execute(locstem_default_insert, data)
+            connection.commit()
+        except psycopg2.errors.UniqueViolation:
+            connection.rollback()
 
 clear_segment_witnesses = "DELETE FROM apparatus" \
                           " WHERE pass_id=(select pass_id from passages where passage = %s)"
