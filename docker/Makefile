@@ -24,11 +24,21 @@ backup:
 	pg_dump --format custom mark_ph31 -n ntg -T "ntg.original_*" -T "ntg.tmp_*" \
 			--exclude-table-data="ntg.notes*" > /tmp/backup/mark_ph31.dump
 
-run: build
-	docker-compose up
+run: 
+	sudo docker-compose up
+
+stop: 
+	sudo docker-compose stop
 
 cbgm: build
 	docker-compose run ntg-app-server cbgm
+
+dbshell:
+	sudo docker exec -i -t docker_ntg-db-server_1 /bin/bash
+
+ntvmrimport:
+	python ../scripts/python/ntvmrimport.py
+
 
 # TODO integrate in gitlab registry of wwu.it
 # push:
@@ -38,12 +48,12 @@ cbgm: build
 # 	docker logout
 
 clean:
-	docker container stop $$(docker container ls -a -q)
-	docker container rm   $$(docker container ls -a -q)
-	docker network prune -f
-	docker rmi -f $$(docker images --filter dangling=true -qa)
-	docker volume rm $$(docker volume ls --filter dangling=true -q)
-	docker rmi -f $$(docker images -qa)
+	docker container stop $$(docker container ls -a -q) || true
+	docker container rm   $$(docker container ls -a -q) || true
+	docker network prune -f || true
+	docker rmi -f $$(docker images --filter dangling=true -qa) || true
+	docker volume rm $$(docker volume ls --filter dangling=true -q) || true
+	docker rmi -f $$(docker images -qa) || true
 
 clean-volume:
-	docker-compose down --volumes
+	sudo docker-compose down --volumes
