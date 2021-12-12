@@ -18,7 +18,7 @@ connection.commit()
 # manuscripts table once with all MSS
 #1, 0, A and 2, 1, MT in first and second place
 
-mss_insert_query = " INSERT INTO manuscripts (hsnr, hs) VALUES (%s, %s)"
+mss_insert_query = "INSERT INTO manuscripts (hsnr, hs) VALUES (%s, %s)"
 cursor.execute('DELETE FROM manuscripts')
 connection.commit()
 
@@ -31,9 +31,53 @@ connection.commit()
 cursor.execute('ALTER SEQUENCE passages_pass_id_seq RESTART WITH 1')
 connection.commit()
 
-cursor.execute(mss_insert_query, (0, 'A'))
-cursor.execute(mss_insert_query, (1, 'MT'))
+cursor.execute('DELETE FROM readings')
 connection.commit()
+
+cursor.execute('DELETE FROM apparatus')
+connection.commit()
+
+def get_all_witnesses(app):
+    witnesses = []
+    idnos = app.findall('.//{http://www.tei-c.org/ns/1.0}idno')
+    for id in idnos:
+        witnesses.append(id.text)
+    return witnesses
+
+def get_hsnr(wit):
+    supp = 0
+    if wit[-1].lower() == 's':
+        supp = 1
+        wit = wit[:-1]
+    if wit[-2:].lower() == 's1':
+        supp = 1
+        wit = wit[:-2]
+    if wit[-2:].lower() == 's2':
+        supp = 2
+        wit = wit[:-2]
+    if wit[0] == 'P':
+        return 100000 + (int(wit[1:]) * 10) + supp
+    if wit[0] == 'L':
+        return 400000 + (int(wit[1:]) * 10) + supp
+    if wit[0] == '0':
+        return 200000 + (int(wit[1:]) * 10) + supp
+    return 300000 + (int(wit) * 10) + supp
+
+def add_hsnr(witnesses):
+    expanded_witnesses = []
+    for wit in witnesses:
+        expanded_witnesses.append((get_hsnr(wit), wit))
+    expanded_witnesses.sort(key=lambda x: x[0])
+    return expanded_witnesses
+
+def add_manuscripts(app):
+    witnesses = get_all_witnesses(app)
+    witnesses = add_hsnr(witnesses)
+    cursor.execute(mss_insert_query, (0, 'A'))
+    cursor.execute(mss_insert_query, (1, 'MT'))
+    for witness in witnesses:
+        cursor.execute(mss_insert_query, witness)
+    connection.commit()
 
 def get_passage_data(ref, start, end):
     try:
@@ -42,7 +86,7 @@ def get_passage_data(ref, start, end):
         return None
     begadr = 90000000 + (int(chapter) * 100000) + (int(verse) * 1000) + start
     endadr = 90000000 + (int(chapter) * 100000) + (int(verse) * 1000) + end
-    passage = '[{},{})'.format(begadr, endadr)
+    passage = '[{},{})'.format(begadr, endadr + 1)
     return (9, begadr, endadr, passage, True, False, False, False)
 
 def is_variant(app):
@@ -55,6 +99,8 @@ def is_variant(app):
         return True
     return False
 
+MSS_added = False
+
 for file in [f for f in os.listdir(data_dir)
              if f[-4:] == '.xml' and f != 'basetext.xml']:
 
@@ -62,6 +108,9 @@ for file in [f for f in os.listdir(data_dir)
     root = tree.getroot()
 
     for app in root.findall('.//{http://www.tei-c.org/ns/1.0}app'):
+        if not MSS_added:
+            add_manuscripts(app)
+            MSS_added = True
         if is_variant(app):
             ref = app.get('n')
             start = int(app.get('from'))
@@ -69,25 +118,73 @@ for file in [f for f in os.listdir(data_dir)
             # passages (once per app)
             passage_data = get_passage_data(ref, start, end)
             if passage_data is not None:
-                # try:
-                print(passage_data)
                 cursor.execute("""INSERT INTO passages (bk_id, begadr, endadr,
                                passage, variant, spanning, spanned, fehlvers)
                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                                passage_data)
                 connection.commit()
 
-                # except psycopg2.errors.UniqueViolation:
-                #     connection.rollback()
-                #     print('failed')
-                #     pass
+                # readings (once per main reading) (fehlverse is I think for when there is no a text)
+                for rdg in app.findall('.//{http://www.tei-c.org/ns/1.0}rdg'):
+                    if rdg.get('type') != 'subreading':
+                        labez = rdg.get('n')
+                        if '/' not in labez:
+                            if labez in ['zz', 'zu']:
+                                lesart = None
+                            else:
+                                lesart = rdg.text
+                                if lesart == 'om':
+                                    lesart = None
+                            data = (passage_data[3], labez, lesart)
+                            cursor.execute("""INSERT INTO readings (pass_id, labez, lesart)
+                                           VALUES ((select pass_id from passages where passage = %s), %s, %s)""",
+                                           data)
+                            connection.commit()
+
+                    # apparatus (once per witness)
+                    for witness in rdg.findall('.//{http://www.tei-c.org/ns/1.0}idno'):
+                        app_insert = """INSERT INTO apparatus (ms_id, pass_id, labez,
+                                     cbgm, labezsuf, certainty, lesart, origin)
+                                     VALUES ((select ms_id from manuscripts where hs = %s),
+                                     (select pass_id from passages where passage = %s), %s, %s, %s, %s, %s, %s)"""
+                        hs = witness.text
+                        type = rdg.get('type')
+                        if type != 'subreading':
+                            labez = rdg.get('n')
+                            labezsuf = ''
+                            lesart = ''
+                        else:
+                            labezsuf = rdg.get('n').replace(labez, '', 1)
+                            lesart = rdg.text
+                        if '/' not in labez:
+                            data = (hs, passage_data[3], labez, True, labezsuf, 1, lesart, 'ATT')
+                            cursor.execute(app_insert, data)
+                            connection.commit()
+                        else:
+                            labels = labez.split('/')
+                            for label in labels:
+                                data = (hs, passage_data[3], label, False, labezsuf, 1/len(labels), lesart, 'ZW')
+                                cursor.execute(app_insert, data)
+                                connection.commit()
 
 
-            # readings (once per main reading) (fehlverse is I think for when there is no a text)
-
-            # apparatus (once per witness)
+                    # if a reading could support multiple other readings then cbgm in apparatus is set to false
 
 
+    # this is taken from the prepare.py script. It seems to do something.
+    # We have overlapping overlaps which I am not sure the INTF allow so I'm not
+    # sure if it is doing the right thing equally I'm not sure that this is
+    # needed at all because I don't know what the booleans are used for
+    cursor.execute(""" UPDATE passages p
+                    SET spanned = EXISTS (
+                      SELECT passage FROM passages o
+                      WHERE o.passage @> p.passage AND p.pass_id != o.pass_id
+                    ),
+                    spanning = EXISTS (
+                      SELECT passage FROM passages i
+                      WHERE i.passage <@ p.passage AND p.pass_id != i.pass_id
+                    )""")
+    connection.commit()
 
 
 
