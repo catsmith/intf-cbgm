@@ -31,6 +31,18 @@ connection.commit()
 cursor.execute('DELETE FROM apparatus')
 connection.commit()
 
+cursor.execute("""DELETE FROM ms_cliques
+                WHERE ms_id = (select ms_id from manuscripts where hs = %s)""",
+               ('MT',))
+cursor.execute("""DELETE FROM ms_cliques_tts
+                WHERE ms_id = (select ms_id from manuscripts where hs = %s)""",
+               ('MT',))
+cursor.execute("""DELETE FROM apparatus
+                WHERE ms_id = (select ms_id from manuscripts where hs = %s)""",
+               ('MT',))
+connection.commit()
+
+
 def get_all_witnesses(app):
     witnesses = []
     idnos = app.findall('.//{http://www.tei-c.org/ns/1.0}idno')
@@ -95,6 +107,38 @@ def is_variant(app):
 
 MSS_added = False
 
+BYZ_WITS = set(['020', '049', '1', '35', '398', '424', '1069', '1617', '2352'])
+
+def get_MT_reading(app):
+    byz_reading = None
+    singular = []
+    candidate = None
+    all_readings = {}
+    for rdg in app.findall('./{http://www.tei-c.org/ns/1.0}rdg'):
+        if rdg.get('type') != 'subreading':
+            label = rdg.get('n')
+            all_readings[label] = [x.text for x in rdg.findall('.//{http://www.tei-c.org/ns/1.0}idno')]
+        else:
+            all_readings[label].extend([x.text for x in rdg.findall('.//{http://www.tei-c.org/ns/1.0}idno')])
+    for key in all_readings:
+        witness_compare = set(all_readings[key]).intersection(BYZ_WITS)
+        if len(witness_compare) >= 8:
+            return key
+        if len(witness_compare) > 1 and len(witness_compare) < 7:
+            return 'zz'
+        if len(witness_compare) == 1:
+            singular.append(key)
+        if len(witness_compare) == 7:
+            candidate = key
+    if candidate is not None and len(singular) == 2:
+        return candidate
+    return None
+
+app_insert = """INSERT INTO apparatus (ms_id, pass_id, labez,
+             cbgm, labezsuf, certainty, lesart, origin)
+             VALUES ((select ms_id from manuscripts where hs = %s),
+             (select pass_id from passages where passage = %s), %s, %s, %s, %s, %s, %s)"""
+
 for file in [f for f in os.listdir(data_dir)
              if f[-4:] == '.xml' and f != 'basetext.xml']:
 
@@ -106,10 +150,14 @@ for file in [f for f in os.listdir(data_dir)
             add_manuscripts(app)
             MSS_added = True
         if is_variant(app):
+            MT_reading_label = get_MT_reading(app)
+            if MT_reading_label is None:
+                raise ValueError('MT reading is not defined')
+            MT_added = False
             ref = app.get('n')
-            print(ref)
             start = int(app.get('from'))
             end = int(app.get('to'))
+            print('{}/{}-{}'.format(ref, start, end))
             # passages (once per app)
             passage_data = get_passage_data(ref, start, end)
             if passage_data is not None:
@@ -140,13 +188,18 @@ for file in [f for f in os.listdir(data_dir)
                                            VALUES ((select pass_id from passages where passage = %s), %s, %s, %s)""",
                                            clique_data)
                             connection.commit()
+                        if labez == MT_reading_label:
+                            data = ('MT', passage_data[3], labez, True, '', 1, None, 'BYZ')
+                            cursor.execute(app_insert, data)
+                            clique_data = ('MT', passage_data[3], labez, 1, 0)
+                            cursor.execute("""SET ntg.user_id = 0; INSERT INTO ms_cliques (ms_id, pass_id, labez, clique, user_id_start)
+                                           VALUES ((select ms_id from manuscripts where hs = %s),
+                                                   (select pass_id from passages where passage = %s), %s, %s, %s)""",
+                                           clique_data)
+                            connection.commit()
 
                     # apparatus (once per witness)
                     for witness in rdg.findall('.//{http://www.tei-c.org/ns/1.0}idno'):
-                        app_insert = """INSERT INTO apparatus (ms_id, pass_id, labez,
-                                     cbgm, labezsuf, certainty, lesart, origin)
-                                     VALUES ((select ms_id from manuscripts where hs = %s),
-                                     (select pass_id from passages where passage = %s), %s, %s, %s, %s, %s, %s)"""
                         hs = witness.text
                         type = rdg.get('type')
                         if type != 'subreading':
@@ -181,8 +234,9 @@ for file in [f for f in os.listdir(data_dir)
                                                        (select pass_id from passages where passage = %s), %s, %s, %s)""",
                                                clique_data)
                                 connection.commit()
-
-
+            # if not added MT yet
+            if MT_added is False:
+                pass
     # this is taken from the prepare.py script. It seems to do something.
     # We have overlapping overlaps which I am not sure the INTF allow so I'm not
     # sure if it is doing the right thing equally I'm not sure that this is
