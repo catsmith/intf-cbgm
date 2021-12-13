@@ -12,20 +12,14 @@ connection = psycopg2.connect(user="ntg",
                               database="gal_ph1")
 cursor = connection.cursor()
 
-cursor.execute('DELETE FROM passages')
+cursor.execute('SET ntg.user_id = 0; DELETE FROM manuscripts')
 connection.commit()
-
-# manuscripts table once with all MSS
-#1, 0, A and 2, 1, MT in first and second place
-
 mss_insert_query = "INSERT INTO manuscripts (hsnr, hs) VALUES (%s, %s)"
-cursor.execute('DELETE FROM manuscripts')
-connection.commit()
 
 cursor.execute('ALTER SEQUENCE manuscripts_ms_id_seq RESTART WITH 1')
 connection.commit()
 
-cursor.execute('DELETE FROM passages')
+cursor.execute('SET ntg.user_id = 0; DELETE FROM passages')
 connection.commit()
 
 cursor.execute('ALTER SEQUENCE passages_pass_id_seq RESTART WITH 1')
@@ -113,6 +107,7 @@ for file in [f for f in os.listdir(data_dir)
             MSS_added = True
         if is_variant(app):
             ref = app.get('n')
+            print(ref)
             start = int(app.get('from'))
             end = int(app.get('to'))
             # passages (once per app)
@@ -139,6 +134,11 @@ for file in [f for f in os.listdir(data_dir)
                             cursor.execute("""INSERT INTO readings (pass_id, labez, lesart)
                                            VALUES ((select pass_id from passages where passage = %s), %s, %s)""",
                                            data)
+                            # also add to cliques table (importMatthew does this)
+                            clique_data = (passage_data[3], labez, 1, 0)
+                            cursor.execute("""SET ntg.user_id = 0; INSERT INTO cliques (pass_id, labez, clique, user_id_start)
+                                           VALUES ((select pass_id from passages where passage = %s), %s, %s, %s)""",
+                                           clique_data)
                             connection.commit()
 
                     # apparatus (once per witness)
@@ -159,16 +159,28 @@ for file in [f for f in os.listdir(data_dir)
                         if '/' not in labez:
                             data = (hs, passage_data[3], labez, True, labezsuf, 1, lesart, 'ATT')
                             cursor.execute(app_insert, data)
+                            # also add to ms_cliques table (importMatthew does this)
+                            clique_data = (hs, passage_data[3], labez, 1, 0)
+                            cursor.execute("""SET ntg.user_id = 0; INSERT INTO ms_cliques (ms_id, pass_id, labez, clique, user_id_start)
+                                           VALUES ((select ms_id from manuscripts where hs = %s),
+                                                   (select pass_id from passages where passage = %s), %s, %s, %s)""",
+                                           clique_data)
                             connection.commit()
                         else:
                             labels = labez.split('/')
+                            # these are recorded separately as zw and with cbgm set to false
                             for label in labels:
+                                if (len(label) > 1):
+                                    label = label[0]
                                 data = (hs, passage_data[3], label, False, labezsuf, 1/len(labels), lesart, 'ZW')
                                 cursor.execute(app_insert, data)
+                                # also add to ms_cliques table (importMatthew does this)
+                                clique_data = (hs, passage_data[3], label, 1, 0)
+                                cursor.execute("""SET ntg.user_id = 0; INSERT INTO ms_cliques (ms_id, pass_id, labez, clique, user_id_start)
+                                               VALUES ((select ms_id from manuscripts where hs = %s),
+                                                       (select pass_id from passages where passage = %s), %s, %s, %s)""",
+                                               clique_data)
                                 connection.commit()
-
-
-                    # if a reading could support multiple other readings then cbgm in apparatus is set to false
 
 
     # this is taken from the prepare.py script. It seems to do something.
