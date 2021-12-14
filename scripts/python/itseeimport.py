@@ -12,6 +12,12 @@ connection = psycopg2.connect(user="ntg",
                               database="gal_ph1")
 cursor = connection.cursor()
 
+cursor.execute("""ALTER TABLE locstem DISABLE TRIGGER locstem_trigger""")
+connection.commit()
+
+cursor.execute('DELETE FROM locstem')
+connection.commit()
+
 cursor.execute('SET ntg.user_id = 0; DELETE FROM manuscripts')
 connection.commit()
 mss_insert_query = "INSERT INTO manuscripts (hsnr, hs) VALUES (%s, %s)"
@@ -29,6 +35,9 @@ cursor.execute('DELETE FROM readings')
 connection.commit()
 
 cursor.execute('DELETE FROM apparatus')
+connection.commit()
+
+cursor.execute('DELETE FROM ms_ranges')
 connection.commit()
 
 cursor.execute("""DELETE FROM ms_cliques
@@ -134,10 +143,28 @@ def get_MT_reading(app):
         return candidate
     return None
 
+def add_ms_ranges():
+    ms_range_insert = """INSERT INTO ms_ranges (rg_id, ms_id, length)
+                         VALUES (%s, %s, %s)"""
+    cursor.execute("""SELECT ms_id FROM manuscripts""")
+    ms_ids = [x[0] for x in cursor.fetchall()]
+    cursor.execute("""SELECT rg_id FROM ranges WHERE bk_id = 9""")
+    ranges = cursor.fetchall()
+    for range in ranges:
+        range_id = range[0]
+        for ms_id in ms_ids:
+            cursor.execute(ms_range_insert, (range_id, ms_id, 0))
+    connection.commit()
+
+
+
 app_insert = """INSERT INTO apparatus (ms_id, pass_id, labez,
              cbgm, labezsuf, certainty, lesart, origin)
              VALUES ((select ms_id from manuscripts where hs = %s),
              (select pass_id from passages where passage = %s), %s, %s, %s, %s, %s, %s)"""
+locstem_insert = """INSERT INTO locstem (pass_id, labez, clique, source_labez, source_clique, user_id_start)
+                    VALUES ((select pass_id from passages where passage = %s), %s, %s, %s, %s, %s)"""
+
 
 for file in [f for f in os.listdir(data_dir)
              if f[-4:] == '.xml' and f != 'basetext.xml']:
@@ -148,6 +175,7 @@ for file in [f for f in os.listdir(data_dir)
     for app in root.findall('.//{http://www.tei-c.org/ns/1.0}app'):
         if not MSS_added:
             add_manuscripts(app)
+            add_ms_ranges()
             MSS_added = True
         if is_variant(app):
             MT_reading_label = get_MT_reading(app)
@@ -166,7 +194,6 @@ for file in [f for f in os.listdir(data_dir)
                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                                passage_data)
                 connection.commit()
-
                 # readings (once per main reading) (fehlverse is I think for when there is no a text)
                 for rdg in app.findall('.//{http://www.tei-c.org/ns/1.0}rdg'):
                     if rdg.get('type') != 'subreading':
@@ -188,8 +215,16 @@ for file in [f for f in os.listdir(data_dir)
                                            VALUES ((select pass_id from passages where passage = %s), %s, %s, %s)""",
                                            clique_data)
                             connection.commit()
+                            # also add to locstem table if not zu, zz
+                            if labez == 'a':
+                                data = (passage_data[3], labez, '1', '*', '1', 0)
+                                cursor.execute(locstem_insert, data)
+                            elif labez not in ['zz', 'zu']:
+                                data = (passage_data[3], labez, '1', 'a', '1', 0)
+                                cursor.execute(locstem_insert, data)
+
                         if labez == MT_reading_label:
-                            data = ('MT', passage_data[3], labez, True, '', 1, None, 'BYZ')
+                            data = ('MT', passage_data[3], labez, True, '', 1, lesart, 'BYZ')
                             cursor.execute(app_insert, data)
                             clique_data = ('MT', passage_data[3], labez, 1, 0)
                             cursor.execute("""SET ntg.user_id = 0; INSERT INTO ms_cliques (ms_id, pass_id, labez, clique, user_id_start)
@@ -205,10 +240,14 @@ for file in [f for f in os.listdir(data_dir)
                         if type != 'subreading':
                             labez = rdg.get('n')
                             labezsuf = ''
-                            lesart = ''
+                            lesart = rdg.text
+                            if lesart == 'om':
+                                lesart = None
                         else:
                             labezsuf = rdg.get('n').replace(labez, '', 1)
                             lesart = rdg.text
+                            if lesart == 'om':
+                                lesart = None
                         if '/' not in labez:
                             data = (hs, passage_data[3], labez, True, labezsuf, 1, lesart, 'ATT')
                             cursor.execute(app_insert, data)
@@ -235,8 +274,9 @@ for file in [f for f in os.listdir(data_dir)
                                                clique_data)
                                 connection.commit()
             # if not added MT yet
-            if MT_added is False:
-                pass
+            # if MT_added is False:
+            #     print('MT missing')
+            #     pass
     # this is taken from the prepare.py script. It seems to do something.
     # We have overlapping overlaps which I am not sure the INTF allow so I'm not
     # sure if it is doing the right thing equally I'm not sure that this is
@@ -251,6 +291,10 @@ for file in [f for f in os.listdir(data_dir)
                       WHERE i.passage <@ p.passage AND p.pass_id != i.pass_id
                     )""")
     connection.commit()
+
+cursor.execute("""ALTER TABLE locstem ENABLE TRIGGER locstem_trigger""")
+connection.commit()
+
 
 
 
