@@ -1,7 +1,11 @@
 version: "3"
 services:
   ntg-db-server:
-    image: scdh/intf-cbgm-db-server
+    image: intf/ntg-db-server
+    expose:
+      - 5432
+    ports:
+      - 5432:5432
     volumes:
       - pgdata:/var/lib/postgresql
     environment:
@@ -10,7 +14,7 @@ services:
       DEBUG_LEVEL: 3
 
   ntg-app-server:
-    image: scdh/intf-cbgm-app-server
+    image: intf/ntg-app-server
     expose:
       - 5000
     ports:
