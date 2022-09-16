@@ -165,9 +165,25 @@ app_insert = """INSERT INTO apparatus (ms_id, pass_id, labez,
 locstem_insert = """INSERT INTO locstem (pass_id, labez, clique, source_labez, source_clique, user_id_start)
                     VALUES ((select pass_id from passages where passage = %s), %s, %s, %s, %s, %s)"""
 
+# the order in which verses and variant units are added matters so make
+# sure the chapters are added in the correct order. The xml order takes care of
+# everything else for now but it does means we add overlaps in a different order
+# that that used by the INTF.
 
-for file in [f for f in os.listdir(data_dir)
-             if f[-4:] == '.xml' and f != 'basetext.xml']:
+def get_chapter_number(file_name):
+    ch_marker = file_name[:-4].split('_')[-1]
+    if ch_marker == 'ins':
+        return 0
+    if ch_marker == 'sub':
+        return 99
+    return int(ch_marker.replace('ch', ''))
+
+file_names = [f for f in os.listdir(data_dir)
+              if f[-4:] == '.xml' and f != 'basetext.xml']
+
+file_names.sort(key=get_chapter_number)
+
+for file in file_names:
 
     tree = ET.parse(os.path.join(data_dir, file))
     root = tree.getroot()
