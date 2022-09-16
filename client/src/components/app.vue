@@ -196,7 +196,7 @@ const store = new Vuex.Store({
     },
     current_user: {
       username: "anonymous",
-      roles: ["public"]
+      roles: ["public", "editor"]
     }
   },
   mutations: {
