@@ -73,10 +73,7 @@
         "vue-devtools": "*",
         "vue-eslint-parser": "*",
         "vue-loader": "^15",
-<<<<<<< HEAD
-=======
         "webpack": "^4.46.0",
->>>>>>> master
         "webpack-bundle-analyzer": "*",
         "webpack-cli": "*",
         "webpack-dev-server": "*",
