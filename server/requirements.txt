@@ -2,7 +2,7 @@ babel
 flask
 flask-babel
 flask-sqlalchemy
-Flask-User<0.7
+Flask-User==0.6.21
 intervals
 jinja2
 networkx

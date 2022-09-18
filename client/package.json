@@ -30,7 +30,7 @@
         "url": "^0.11.0",
         "velocity-animate": "^2.0.5",
         "vue": "^2.6",
-        "vue-router": "*",
+        "vue-router": "^3.5.3",
         "vue-template-compiler": "*",
         "vuex": "*",
         "webpack": "^4.46.0",
@@ -73,6 +73,10 @@
         "vue-devtools": "*",
         "vue-eslint-parser": "*",
         "vue-loader": "^15",
+<<<<<<< HEAD
+=======
+        "webpack": "^4.46.0",
+>>>>>>> master
         "webpack-bundle-analyzer": "*",
         "webpack-cli": "*",
         "webpack-dev-server": "*",
