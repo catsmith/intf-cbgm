@@ -56,7 +56,11 @@ def get_all_witnesses(app):
     witnesses = []
     idnos = app.findall('.//{http://www.tei-c.org/ns/1.0}idno')
     for id in idnos:
-        witnesses.append(id.text)
+        # rename a manuscript for Galatians
+        if id.text == '2892':
+            witnesses.append('2853')
+        else:
+            witnesses.append(id.text)
     return witnesses
 
 def get_hsnr(wit):
@@ -252,6 +256,9 @@ for file in file_names:
                     # apparatus (once per witness)
                     for witness in rdg.findall('.//{http://www.tei-c.org/ns/1.0}idno'):
                         hs = witness.text
+                        # rename a manuscript for Galatians
+                        if hs == '2892':
+                            hs = '2853'
                         type = rdg.get('type')
                         if type != 'subreading':
                             labez = rdg.get('n')
